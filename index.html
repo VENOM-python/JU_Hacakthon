@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AquaLens · Fish Freshness AI</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #080c14;
+      --surface:     #0e1624;
+      --card:        #121e30;
+      --border:      #1e3352;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --fresh:       #22c55e;
+      --medium:      #f59e0b;
+      --spoiled:     #ef4444;
+      --text:        #e2e8f0;
+      --muted:       #64748b;
+      --font-mono:   'Space Mono', monospace;
+      --font-head:   'Syne', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated grid background ──────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(59,130,246,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 40px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8,12,20,.8);
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      border-radius: 10px;
+      display: grid; place-items: center;
+      font-size: 20px;
+    }
+    .logo-text {
+      font-family: var(--font-head);
+      font-size: 1.4rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-badge {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: .72rem;
+      color: var(--muted);
+    }
+    .pulse {
+      width: 8px; height: 8px;
+      background: var(--fresh);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:.5; transform:scale(1.4); }
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────────── */
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      header { padding: 16px 20px; }
+    }
+
+    /* ── Cards ─────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-head);
+      font-size: .85rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .card-header .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent-cyan);
+    }
+    .card-body { padding: 20px; }
+
+    /* ── Upload zone ────────────────────────────────────────────────────── */
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--accent-blue);
+      background: rgba(59,130,246,.04);
+    }
+    #drop-zone .icon { font-size: 2.8rem; }
+    #drop-zone p { font-size: .82rem; color: var(--muted); text-align: center; line-height: 1.6; }
+    #drop-zone p span { color: var(--accent-cyan); }
+
+    #preview-img {
+      max-width: 100%;
+      max-height: 280px;
+      border-radius: 8px;
+      object-fit: contain;
+      display: none;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 22px;
+      border: none; border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn:hover   { opacity: .85; }
+    .btn:active  { transform: scale(.97); }
+    .btn-primary { background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan)); color: #fff; }
+    .btn-ghost   { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-danger  { background: rgba(239,68,68,.15); border: 1px solid var(--spoiled); color: var(--spoiled); }
+
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+    /* ── Mode tabs ──────────────────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      flex: 1; text-align: center;
+      padding: 12px 10px;
+      font-size: .78rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .2s, border-color .2s;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .tab.active { color: var(--accent-cyan); border-bottom-color: var(--accent-cyan); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Camera ─────────────────────────────────────────────────────────── */
+    #camera-container {
+      position: relative;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      aspect-ratio: 4/3;
+    }
+    #camera-feed {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    #cam-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .82rem; color: var(--muted);
+      background: rgba(0,0,0,.6);
+    }
+
+    /* ── Result panel ───────────────────────────────────────────────────── */
+    #result-panel {
+      display: none;
+      animation: fadeIn .4s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+    /* class badge */
+    .class-badge {
+      display: inline-block;
+      padding: 6px 18px;
+      border-radius: 20px;
+      font-family: var(--font-head);
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: .05em;
+    }
+    .class-badge.Fresh   { background: rgba(34,197,94,.15); color: var(--fresh);   border: 1px solid var(--fresh); }
+    .class-badge.Medium  { background: rgba(245,158,11,.15); color: var(--medium); border: 1px solid var(--medium); }
+    .class-badge.Spoiled { background: rgba(239,68,68,.15);  color: var(--spoiled);border: 1px solid var(--spoiled); }
+
+    /* Freshness gauge */
+    .gauge-wrap {
+      margin: 18px 0;
+    }
+    .gauge-label {
+      display: flex; justify-content: space-between;
+      font-size: .75rem; color: var(--muted); margin-bottom: 6px;
+    }
+    .gauge-track {
+      height: 10px;
+      background: var(--surface);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .gauge-fill {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 1s cubic-bezier(.4,0,.2,1);
+      background: linear-gradient(90deg, var(--spoiled), var(--medium), var(--fresh));
+      background-size: 300% 100%;
+    }
+
+    /* probability bars */
+    .prob-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 8px;
+    }
+    .prob-name { width: 60px; font-size: .78rem; }
+    .prob-track { flex: 1; height: 7px; background: var(--surface); border-radius: 4px; overflow: hidden; }
+    .prob-fill  { height: 100%; border-radius: 4px; transition: width .8s; }
+    .prob-pct   { width: 44px; text-align: right; font-size: .78rem; color: var(--muted); }
+
+    /* heatmap */
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .heatmap-grid img {
+      width: 100%; border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .heatmap-label {
+      font-size: .68rem; color: var(--muted);
+      text-align: center; margin-top: 4px;
+    }
+
+    /* meta row */
+    .meta-row {
+      display: flex; gap: 20px; flex-wrap: wrap;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .meta-item { font-size: .75rem; color: var(--muted); }
+    .meta-item strong { color: var(--text); }
+
+    /* loading spinner */
+    #loading {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: .82rem;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Stats strip ────────────────────────────────────────────────────── */
+    .stats-strip {
+      position: relative; z-index: 1;
+      display: flex;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .stat-item {
+      flex: 1; padding: 14px 20px;
+      border-right: 1px solid var(--border);
+      text-align: center;
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-num { font-family: var(--font-head); font-size: 1.4rem; font-weight: 800; color: var(--accent-cyan); }
+    .stat-desc { font-size: .65rem; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: .05em; }
+
+    /* ── Footer ─────────────────────────────────────────────────────────── */
+    footer {
+      position: relative; z-index: 1;
+      text-align: center;
+      padding: 24px;
+      border-top: 1px solid var(--border);
+      font-size: .72rem;
+      color: var(--muted);
+    }
+    footer span { color: var(--accent-cyan); }
+
+    /* ── TTA toggle ─────────────────────────────────────────────────────── */
+    .toggle-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-top: 12px; font-size: .78rem; color: var(--muted);
+    }
+    .toggle {
+      position: relative; display: inline-block;
+      width: 36px; height: 20px;
+    }
+    .toggle input { display: none; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      left: 3px; top: 3px;
+      width: 14px; height: 14px;
+      background: var(--text);
+      border-radius: 50%;
+      transition: transform .2s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--accent-cyan); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* error toast */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--spoiled); color: #fff;
+      padding: 10px 24px; border-radius: 8px;
+      font-size: .82rem; font-weight: 700;
+      display: none; z-index: 999;
+      animation: fadeIn .3s ease;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🐟</div>
+    <span class="logo-text">AquaLens</span>
+  </div>
+  <div class="header-badge">
+    <div class="pulse"></div>
+    EfficientNetV2 · GradCAM++ · TTA
+  </div>
+</header>
+
+<!-- ── Stats Strip ─────────────────────────────────────────────────────────── -->
+<div class="stats-strip">
+  <div class="stat-item"><div class="stat-num">≥95%</div><div class="stat-desc">Val Accuracy</div></div>
+  <div class="stat-item"><div class="stat-num">3</div><div class="stat-desc">Classes</div></div>
+  <div class="stat-item"><div class="stat-num">GradCAM++</div><div class="stat-desc">Explainability</div></div>
+  <div class="stat-item"><div class="stat-num">ONNX</div><div class="stat-desc">Edge Ready</div></div>
+  <div class="stat-item"><div class="stat-num">TTA×8</div><div class="stat-desc">Augmentation</div></div>
+</div>
+
+<!-- ── Main ────────────────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- LEFT: Input ─────────────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header"><div class="dot"></div> Input</div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('upload')">📁 Upload</div>
+      <div class="tab"       onclick="switchTab('camera')">📷 Camera</div>
+    </div>
+
+    <!-- Upload panel -->
+    <div class="tab-panel active card-body" id="panel-upload">
+      <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <img id="preview-img" src="" alt="preview" />
+        <div id="drop-placeholder">
+          <div class="icon">🐠</div>
+          <p>Drag &amp; drop a fish image here<br/><span>or click to browse</span></p>
+          <p style="font-size:.7rem;margin-top:4px;">JPG · PNG · WEBP · BMP — max 10 MB</p>
+        </div>
+      </div>
+      <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,.bmp" hidden />
+
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="tta-toggle" checked />
+          <span class="toggle-slider"></span>
+        </label>
+        Test-Time Augmentation (TTA ×8) — more accurate, slightly slower
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyseUpload()">⚡ Analyse</button>
+        <button class="btn btn-ghost"   onclick="resetAll()">↺ Reset</button>
+      </div>
+    </div>
+
+    <!-- Camera panel -->
+    <div class="tab-panel card-body" id="panel-camera">
+      <div id="camera-container">
+        <img id="camera-feed" src="" alt="camera" />
+        <div id="cam-overlay">Camera not started</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="startCamera()">▶ Start Camera</button>
+        <button class="btn btn-ghost"   onclick="captureFrame()">📸 Capture &amp; Analyse</button>
+        <button class="btn btn-danger"  onclick="stopCamera()">■ Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Results ─────────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-header"><div class="dot"></div> Analysis Results</div>
+    <div class="card-body">
+
+      <!-- Loading -->
+      <div id="loading">
+        <div class="spinner"></div>
+        Running inference + Grad-CAM++ …
+      </div>
+
+      <!-- Placeholder -->
+      <div id="result-placeholder" style="padding:40px 0;text-align:center;color:var(--muted)">
+        <div style="font-size:3rem;margin-bottom:12px">🔬</div>
+        <p style="font-size:.85rem">Upload or capture a fish image to begin analysis</p>
+      </div>
+
+      <!-- Result -->
+      <div id="result-panel">
+
+        <!-- Class + confidence -->
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;">
+          <div class="class-badge" id="res-class">Fresh</div>
+          <div>
+            <div style="font-family:var(--font-head);font-size:2rem;font-weight:800;" id="res-conf">—%</div>
+            <div style="font-size:.72rem;color:var(--muted);">Confidence</div>
+          </div>
+        </div>
+
+        <!-- Freshness gauge -->
+        <div class="gauge-wrap">
+          <div class="gauge-label">
+            <span>Freshness Score</span>
+            <span id="res-score">—/100</span>
+          </div>
+          <div class="gauge-track">
+            <div class="gauge-fill" id="gauge-fill" style="width:0%"></div>
+          </div>
+          <div class="gauge-label" style="margin-top:4px;">
+            <span>Spoiled</span><span>Medium</span><span>Fresh</span>
+          </div>
+        </div>
+
+        <!-- Probability bars -->
+        <div style="margin-top:16px;">
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Class Probabilities</div>
+          <div class="prob-row">
+            <span class="prob-name" style="color:var(--fresh)">Fresh</span>
+            <div class="prob-track"><div class="prob-fill" id="bar-fresh" style="width:0%;background:var(--fresh)"></div></div>
+            <span class="prob-pct" id="pct-fresh">0%</span>
+          </div>
+          <div class="prob-row">
+            <span class="prob-name" style="color:var(--medium)">Medium</span>
+            <div class="prob-track"><div class="prob-fill" id="bar-medium" style="width:0%;background:var(--medium)"></div></div>
+            <span class="prob-pct" id="pct-medium">0%</span>
+          </div>
+          <div class="prob-row">
+            <span class="prob-name" style="color:var(--spoiled)">Spoiled</span>
+            <div class="prob-track"><div class="prob-fill" id="bar-spoiled" style="width:0%;background:var(--spoiled)"></div></div>
+            <span class="prob-pct" id="pct-spoiled">0%</span>
+          </div>
+        </div>
+
+        <!-- Grad-CAM heatmaps -->
+        <div id="heatmap-section" style="display:none">
+          <div style="font-size:.72rem;color:var(--muted);margin-top:16px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Grad-CAM++ Saliency</div>
+          <div class="heatmap-grid">
+            <div>
+              <img id="img-original" src="" alt="original" />
+              <div class="heatmap-label">Original</div>
+            </div>
+            <div>
+              <img id="img-overlay" src="" alt="overlay" />
+              <div class="heatmap-label">Heatmap Overlay</div>
+            </div>
+          </div>
+          <p style="font-size:.7rem;color:var(--muted);margin-top:8px;line-height:1.6;">
+            🔴 Red = high activation regions (eyes, gills, skin texture) the model uses to determine freshness.
+          </p>
+        </div>
+
+        <!-- Meta -->
+        <div class="meta-row">
+          <div class="meta-item">⏱ Latency <strong id="res-latency">—</strong></div>
+          <div class="meta-item">🖥 Device <strong id="res-device">—</strong></div>
+          <div class="meta-item">🧠 TTA <strong id="res-tta">—</strong></div>
+        </div>
+
+      </div><!-- /result-panel -->
+    </div><!-- /card-body -->
+  </div><!-- /card -->
+
+</main>
+
+<!-- ── Toast ────────────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<!-- ── Footer ──────────────────────────────────────────────────────────────── -->
+<footer>
+  AquaLens · Deep Learning Fish Freshness Classifier ·
+  <span>EfficientNetV2-S + Grad-CAM++</span> ·
+  Built with PyTorch &amp; Flask
+</footer>
+
+<script>
+/* ── State ──────────────────────────────────────────────────────────────────── */
+let currentFile   = null;
+let cameraRunning = false;
+
+/* ── Tab switching ──────────────────────────────────────────────────────────── */
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['upload','camera'][i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach((p, i) => {
+    p.classList.toggle('active', ['panel-upload','panel-camera'][i] === 'panel-' + name);
+  });
+}
+
+/* ── Drag & Drop ────────────────────────────────────────────────────────────── */
+const dropZone = document.getElementById('drop-zone');
+['dragenter','dragover'].forEach(e => dropZone.addEventListener(e, ev => {
+  ev.preventDefault(); dropZone.classList.add('drag-over');
+}));
+['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => {
+  ev.preventDefault(); dropZone.classList.remove('drag-over');
+}));
+dropZone.addEventListener('drop', ev => {
+  const file = ev.dataTransfer.files[0];
+  if (file) loadFile(file);
+});
+document.getElementById('file-input').addEventListener('change', ev => {
+  if (ev.target.files[0]) loadFile(ev.target.files[0]);
+});
+
+function loadFile(file) {
+  currentFile = file;
+  const url   = URL.createObjectURL(file);
+  const prev  = document.getElementById('preview-img');
+  prev.src    = url;
+  prev.style.display = 'block';
+  document.getElementById('drop-placeholder').style.display = 'none';
+  document.getElementById('img-original').src = url;
+}
+
+/* ── Analyse upload ─────────────────────────────────────────────────────────── */
+async function analyseUpload() {
+  if (!currentFile) { showToast('Please select an image first.'); return; }
+  const tta = document.getElementById('tta-toggle').checked;
+
+  showLoading();
+  const form = new FormData();
+  form.append('file', currentFile);
+  form.append('tta', tta.toString());
+
+  try {
+    const res  = await fetch('/predict', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) { showToast(data.error); hideLoading(); return; }
+    renderResult(data, tta);
+  } catch (err) {
+    showToast('Network error: ' + err.message);
+    hideLoading();
+  }
+}
+
+/* ── Camera ─────────────────────────────────────────────────────────────────── */
+function startCamera() {
+  const feed    = document.getElementById('camera-feed');
+  const overlay = document.getElementById('cam-overlay');
+  fetch('/camera/start', { method:'POST' });
+  feed.src      = '/camera_stream';
+  overlay.style.display = 'none';
+  cameraRunning = true;
+}
+
+function stopCamera() {
+  fetch('/camera/stop', { method:'POST' });
+  document.getElementById('camera-feed').src = '';
+  document.getElementById('cam-overlay').style.display = 'flex';
+  cameraRunning = false;
+}
+
+async function captureFrame() {
+  if (!cameraRunning) { showToast('Start the camera first.'); return; }
+
+  // Draw camera frame to canvas to get base64
+  const feed   = document.getElementById('camera-feed');
+  const canvas = document.createElement('canvas');
+  canvas.width  = feed.naturalWidth  || 640;
+  canvas.height = feed.naturalHeight || 480;
+  canvas.getContext('2d').drawImage(feed, 0, 0);
+  const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+
+  // Show as original
+  document.getElementById('img-original').src = dataURL;
+
+  showLoading();
+  try {
+    const res  = await fetch('/predict_base64', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataURL, tta: true }),
+    });
+    const data = await res.json();
+    if (data.error) { showToast(data.error); hideLoading(); return; }
+    renderResult(data, true);
+  } catch (err) {
+    showToast('Network error: ' + err.message);
+    hideLoading();
+  }
+}
+
+/* ── Render result ──────────────────────────────────────────────────────────── */
+function renderResult(data, tta) {
+  hideLoading();
+  document.getElementById('result-placeholder').style.display = 'none';
+
+  const panel = document.getElementById('result-panel');
+  panel.style.display = 'block';
+
+  // Class badge
+  const badge = document.getElementById('res-class');
+  badge.textContent = data.class;
+  badge.className   = 'class-badge ' + data.class;
+
+  // Confidence
+  document.getElementById('res-conf').textContent = data.confidence.toFixed(1) + '%';
+
+  // Freshness gauge
+  const score = data.freshness_score;
+  document.getElementById('res-score').textContent = score.toFixed(0) + '/100';
+  setTimeout(() => {
+    document.getElementById('gauge-fill').style.width = score + '%';
+    document.getElementById('gauge-fill').style.backgroundPosition =
+      (100 - score) + '% 0';
+  }, 50);
+
+  // Probability bars
+  const probs = data.all_probs;
+  ['fresh','medium','spoiled'].forEach(cls => {
+    const key = cls.charAt(0).toUpperCase() + cls.slice(1);
+    const pct = probs[key] || 0;
+    document.getElementById('bar-' + cls).style.width = pct + '%';
+    document.getElementById('pct-' + cls).textContent = pct.toFixed(1) + '%';
+  });
+
+  // Heatmap
+  if (data.overlay_b64) {
+    document.getElementById('img-overlay').src = 'data:image/jpeg;base64,' + data.overlay_b64;
+    document.getElementById('heatmap-section').style.display = 'block';
+  } else {
+    document.getElementById('heatmap-section').style.display = 'none';
+  }
+
+  // Meta
+  document.getElementById('res-latency').textContent = data.latency_ms + ' ms';
+  document.getElementById('res-device').textContent  = data.device || 'cpu';
+  document.getElementById('res-tta').textContent     = tta ? 'Enabled' : 'Off';
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────────── */
+function resetAll() {
+  currentFile = null;
+  document.getElementById('preview-img').style.display = 'none';
+  document.getElementById('drop-placeholder').style.display = '';
+  document.getElementById('result-panel').style.display = 'none';
+  document.getElementById('result-placeholder').style.display = '';
+  document.getElementById('file-input').value = '';
+}
+
+/* ── UI helpers ─────────────────────────────────────────────────────────────── */
+function showLoading() {
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('result-panel').style.display = 'none';
+  document.getElementById('result-placeholder').style.display = 'none';
+}
+function hideLoading() {
+  document.getElementById('loading').style.display = 'none';
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3500);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+# ── Deep Learning ─────────────────────────────────────────────────────────────
+torch>=2.2.0
+torchvision>=0.17.0
+torchaudio>=2.2.0          # optional, for audio datasets
+
+# ── ONNX / Runtime ────────────────────────────────────────────────────────────
+onnx>=1.16.0
+onnxruntime>=1.18.0        # CPU; use onnxruntime-gpu for CUDA
+# onnxruntime-tools>=1.7.0  # Uncomment for INT8 quantisation
+
+# ── Image / Vision ────────────────────────────────────────────────────────────
+Pillow>=10.3.0
+opencv-python>=4.9.0
+
+# ── Data Science ──────────────────────────────────────────────────────────────
+numpy>=1.26.0
+scikit-learn>=1.4.0
+pandas>=2.2.0
+
+# ── Visualisation ─────────────────────────────────────────────────────────────
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# ── Web App ───────────────────────────────────────────────────────────────────
+flask>=3.0.0
+flask-cors>=4.0.0
+gunicorn>=22.0.0           # Production WSGI server
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+tqdm>=4.66.0
+pyyaml>=6.0
+rich>=13.7.0               # Pretty console output
